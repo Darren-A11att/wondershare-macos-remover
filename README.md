@@ -2,11 +2,11 @@
 
 **Complete removal of Wondershare products and all related artifacts from macOS.**
 
-Wondershare products auto-update past the paid license version and won't let you download the version you paid for. Their uninstallers leave behind gigabytes of launch daemons, caches, preferences, helper tools, and background processes. This tool finds and removes all of them.
+Wondershare products auto-update past the version you paid for, then won't let you download the version your license covers. Their uninstallers leave behind gigabytes of launch daemons, caches, preferences, helper tools, and background processes. This tool finds and removes all of them.
 
 ## What It Does
 
-- Dynamically scans your system for all Wondershare artifacts (multiple product name patterns)
+- Dynamically scans your system for all Wondershare artifacts (processes, apps, caches, preferences, helpers)
 - Kills all running Wondershare processes
 - Unloads and removes launch agents and daemons
 - Removes applications, frameworks, and helper tools
@@ -59,14 +59,14 @@ Scanning for Wondershare artifacts...
    [x]  2. PID 5678 WsHelper
 
   ━━━ Applications (2) ━━━
-   [x]  3. Wondershare UniConverter 17.app      (1.8 GB)
-   [x]  4. Wondershare PDFelement.app           (512 MB)
+   [x]  3. Wondershare UniConverter 17.app       (1.8 GB)
+   [x]  4. Wondershare PDFelement.app            (512 MB)
 
   ━━━ System Files (2) ━━━
-   [x]  5. /Library/Application Support/Wondershare    (320 MB)
+   [x]  5. /Library/Application Support/Wondershare    (245 MB)
    [x]  6. /Library/Preferences/com.wondershare.PDFelement.plist
 
-  Selected: 6/6 items (2.6 GB)
+  Selected: 6/6 items (2.5 GB)
 
   Commands: all | none | N | select N-M | list | remove | help | quit
 

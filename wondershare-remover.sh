@@ -81,6 +81,7 @@ ITEM_CATEGORIES=()
 ITEM_SELECTED=()
 ITEM_LABELS=()
 ITEM_SIZES=()
+REPL_FIRST_TOGGLE=1
 
 # =============================================================================
 # Logging Functions
@@ -313,7 +314,8 @@ scan_processes() {
 scan_applications() {
     FOUND_APPLICATIONS=()
 
-    # Wondershare products don't always include "Wondershare" in the name
+    # Wondershare products don't always include "Wondershare" in the name,
+    # so we need multiple search patterns
     local app_name_patterns=(
         "*Wondershare*"
         "*Filmora*"
@@ -328,25 +330,16 @@ scan_applications() {
         "*Anireel*"
     )
 
-    # Find by name patterns
-    local pattern
-    for pattern in "${app_name_patterns[@]}"; do
+    # Find by name patterns (with deduplication)
+    local seen_apps=""
+    local pat
+    for pat in "${app_name_patterns[@]}"; do
         while IFS= read -r app; do
-            if [[ -n "$app" ]]; then
-                # Deduplicate
-                local already=0
-                local existing
-                for existing in "${FOUND_APPLICATIONS[@]+"${FOUND_APPLICATIONS[@]}"}"; do
-                    if [[ "$existing" == "$app" ]]; then
-                        already=1
-                        break
-                    fi
-                done
-                if [[ $already -eq 0 ]]; then
-                    FOUND_APPLICATIONS+=("$app")
-                fi
+            if [[ -n "$app" ]] && [[ "$seen_apps" != *"|$app|"* ]]; then
+                FOUND_APPLICATIONS+=("$app")
+                seen_apps="${seen_apps}|${app}|"
             fi
-        done < <(find /Applications -maxdepth 2 -iname "$pattern" -type d 2>/dev/null || true)
+        done < <(find /Applications -maxdepth 2 -iname "$pat" -type d 2>/dev/null || true)
     done
 
     # Also check all .app bundles for com.wondershare bundle IDs (case-insensitive)
@@ -358,16 +351,9 @@ scan_applications() {
             bid_lower="$(echo "$bid" | tr '[:upper:]' '[:lower:]')"
             if [[ "$bid_lower" == com.wondershare.* ]]; then
                 # Check not already in list
-                local already=0
-                local existing
-                for existing in "${FOUND_APPLICATIONS[@]+"${FOUND_APPLICATIONS[@]}"}"; do
-                    if [[ "$existing" == "$app" ]]; then
-                        already=1
-                        break
-                    fi
-                done
-                if [[ $already -eq 0 ]]; then
+                if [[ "$seen_apps" != *"|$app|"* ]]; then
                     FOUND_APPLICATIONS+=("$app")
+                    seen_apps="${seen_apps}|${app}|"
                 fi
             fi
         fi
@@ -404,18 +390,18 @@ scan_launch_agents() {
 scan_system_files() {
     FOUND_SYSTEM_FILES=()
     local patterns=(
-        "/Library/Application Support/Wondershare"
-        "/Library/Application Support/MediaDownloadKit"
-        "/Library/Preferences/com.wondershare.*"
-        "/Library/PrivilegedHelperTools/com.wondershare.*"
-        "/Library/Frameworks/Wondershare*"
+        "/Library/Application Support:Wondershare"
+        "/Library/Application Support:MediaDownloadKit"
+        "/Library/Preferences:com.wondershare.*"
+        "/Library/Preferences:com.Wondershare.*"
+        "/Library/PrivilegedHelperTools:com.wondershare.*"
+        "/Library/PrivilegedHelperTools:com.Wondershare.*"
+        "/Library/Frameworks:Wondershare*"
     )
     local pat
     for pat in "${patterns[@]}"; do
-        # Use eval-free glob expansion
-        local parent dir_part base_part
-        dir_part="$(dirname "$pat")"
-        base_part="$(basename "$pat")"
+        local dir_part="${pat%%:*}"
+        local base_part="${pat##*:}"
         if [[ -d "$dir_part" ]]; then
             while IFS= read -r match; do
                 if [[ -n "$match" ]]; then
@@ -1056,6 +1042,10 @@ repl_toggle_item() {
         printf "   ${DIM}[ ] %2d. %s%s${RESET}\n" "$num" "${ITEM_LABELS[$idx]}" "$size_str"
     fi
     display_selection_summary
+    if [[ $REPL_FIRST_TOGGLE -eq 1 ]]; then
+        REPL_FIRST_TOGGLE=0
+        printf "  ${DIM}Tip: type 'remove' when ready, or 'list' to review all items${RESET}\n"
+    fi
 }
 
 repl_select_range() {
@@ -1274,29 +1264,47 @@ repl_dryrun() {
     info "Dry run complete. No files were modified."
 }
 
+repl_welcome() {
+    printf "\n"
+    printf "  ${BOLD}What next?${RESET}\n"
+    printf "  All items above are selected for removal.\n"
+    printf "\n"
+    printf "  ${GREEN}${BOLD}remove${RESET}       Remove selected items (asks to confirm)\n"
+    printf "  ${YELLOW}keep N${RESET}       Keep an item (deselect from removal)\n"
+    printf "  ${YELLOW}keep 3-7${RESET}     Keep a range of items\n"
+    printf "  ${YELLOW}keep apps${RESET}    Keep an entire category\n"
+    printf "  ${DIM}help         Full command reference${RESET}\n"
+}
+
 repl_help() {
-    cat <<'RHELP'
-
-  REPL Commands:
-    N              Toggle item N on/off
-    all            Select all items
-    none           Deselect all items
-    select N       Select item N
-    select N-M     Select items N through M
-    deselect N     Deselect item N
-    deselect N-M   Deselect items N through M
-    select apps    Select entire category
-    deselect apps  Deselect entire category
-    list           Redisplay item list
-    rescan         Re-scan system (resets selections)
-    remove         Remove selected items (with confirmation)
-    dry-run        Preview removal without deleting
-    help           Show this help
-    quit, q        Exit
-
-  Categories: proc, apps, agents, sys, user, root
-
-RHELP
+    printf "\n"
+    printf "  ${BOLD}━━━ Quick Start ━━━${RESET}\n"
+    printf "  Everything is selected. Deselect what you want to keep,\n"
+    printf "  then type ${GREEN}${BOLD}remove${RESET} to delete the rest.\n"
+    printf "\n"
+    printf "  ${BOLD}━━━ Actions ━━━${RESET}\n"
+    printf "    remove         Remove selected items (with confirmation)\n"
+    printf "    dry-run        Preview what would be removed\n"
+    printf "    list           Redisplay the item list\n"
+    printf "    rescan         Re-scan system (resets selections)\n"
+    printf "\n"
+    printf "  ${BOLD}━━━ Adjusting Selection ━━━${RESET}\n"
+    printf "    N              Toggle item N on/off\n"
+    printf "    keep N         Deselect item N (keep it on disk)\n"
+    printf "    keep N-M       Deselect items N through M\n"
+    printf "    keep apps      Deselect entire category\n"
+    printf "    select N       Reselect item N for removal\n"
+    printf "    select N-M     Reselect items N through M\n"
+    printf "    select apps    Reselect entire category\n"
+    printf "    all / none     Select or deselect everything\n"
+    printf "\n"
+    printf "  ${BOLD}━━━ Categories ━━━${RESET}\n"
+    printf "    processes  apps  agents  system  user  root\n"
+    printf "\n"
+    printf "  ${BOLD}━━━ Other ━━━${RESET}\n"
+    printf "    help, h, ?     Show this help\n"
+    printf "    quit, q        Exit without removing\n"
+    printf "\n"
 }
 
 repl_quit() {
@@ -1355,6 +1363,14 @@ repl_parse_command() {
                 repl_select_category "deselect" "$arg"
             fi
             ;;
+        keep\ *)
+            local arg="${input#keep }"
+            if [[ "$arg" =~ ^[0-9]+(-[0-9]+)?$ ]]; then
+                repl_select_range "deselect" "$arg"
+            else
+                repl_select_category "deselect" "$arg"
+            fi
+            ;;
         *)
             # Bare number = toggle
             if [[ "$input" =~ ^[0-9]+$ ]]; then
@@ -1391,7 +1407,7 @@ cmd_interactive() {
         return
     fi
 
-    printf "\n  ${DIM}Commands: all | none | N | select N-M | list | remove | help | quit${RESET}\n"
+    repl_welcome
 
     while true; do
         printf "\n${CYAN}wondershare>${RESET} "
